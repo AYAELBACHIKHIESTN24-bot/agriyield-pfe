@@ -8,11 +8,11 @@ from __future__ import annotations
 
 import os
 import numpy as np
+import pandas as pd
 import streamlit as st
 import tensorflow as tf
 from PIL import Image
 from tensorflow.keras import layers
-import plotly.graph_objects as go
 
 class TemporalAttention(layers.Layer):
     def __init__(self, units=32, **kwargs):
@@ -218,29 +218,10 @@ with col_left:
 with col_center:
     st.markdown('<div class="panel"><div class="panel-title">📊 CARTE & TENDANCE NDVI</div></div>', unsafe_allow_html=True)
 
-    # Graphique NDVI (01, 03, 05)
-    fig_ndvi = go.Figure()
-    fig_ndvi.add_trace(
-        go.Scatter(
-            x=["Janvier", "Mars", "Mai"],
-            y=[ndvi_01, ndvi_03, ndvi_05],
-            mode="lines+markers",
-            line=dict(color="#10b981", width=3),
-            marker=dict(size=12, color="#f59e0b"),
-            fill="tozeroy",
-            fillcolor="rgba(16, 185, 129, 0.2)",
-        )
-    )
-    fig_ndvi.update_layout(
-        title="Tendance NDVI (01, 03, 05)",
-        template="plotly_dark",
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(6, 28, 20, 0.5)",
-        font=dict(color="#e5e7eb"),
-        margin=dict(l=40, r=40, t=50, b=40),
-        height=220,
-    )
-    st.plotly_chart(fig_ndvi, use_container_width=True)
+    # Graphique NDVI (01, 03, 05) — natif Streamlit
+    st.markdown("**Tendance NDVI (01, 03, 05)**")
+    df_ndvi = pd.DataFrame({"NDVI": [ndvi_01, ndvi_03, ndvi_05]}, index=["Janvier", "Mars", "Mai"])
+    st.line_chart(df_ndvi)
 
     # Aperçu image satellite
     st.markdown("**Aperçu image satellite**")
@@ -281,25 +262,13 @@ with col_right:
             </div>
             """, unsafe_allow_html=True)
 
-            # Barres : Prédiction vs Référence
-            fig_bar = go.Figure()
-            fig_bar.add_trace(
-                go.Bar(
-                    x=["Prédiction actuelle", "Moyenne indicative"],
-                    y=[pred, pred * 0.85],
-                    marker_color=["#10b981", "#374151"],
-                )
+            # Barres : Prédiction vs Référence — natif Streamlit
+            st.markdown("**Comparaison**")
+            df_bar = pd.DataFrame(
+                {"Valeur (Qx/Ha)": [pred, pred * 0.85]},
+                index=["Prédiction actuelle", "Moyenne indicative"],
             )
-            fig_bar.update_layout(
-                title="Comparaison",
-                template="plotly_dark",
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(6, 28, 20, 0.5)",
-                font=dict(color="#e5e7eb"),
-                margin=dict(l=40, r=40, t=40, b=40),
-                height=200,
-            )
-            st.plotly_chart(fig_bar, use_container_width=True)
+            st.bar_chart(df_bar)
 
             st.balloons()
     else:
@@ -327,3 +296,4 @@ with st.expander("ℹ️ À propos — AGRO-INSIGHT MAROC"):
 
     Modèle : **ViT + GRU + Attention + tabulaire**.
     """)
+
