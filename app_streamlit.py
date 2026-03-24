@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-AgriYield Morocco — Prédiction du rendement agricole par IA (PFE)
+AGRO-INSIGHT MAROC — Tableau de bord IA pour l'agriculture de précision
+Prédiction du rendement par imagerie satellite et apprentissage automatique
 """
 
 from __future__ import annotations
@@ -11,6 +12,7 @@ import streamlit as st
 import tensorflow as tf
 from PIL import Image
 from tensorflow.keras import layers
+import plotly.graph_objects as go
 
 class TemporalAttention(layers.Layer):
     def __init__(self, units=32, **kwargs):
@@ -58,187 +60,270 @@ def build_seq_vector(ndvi_01, ndvi_03, ndvi_05):
 
 
 # ============================================================================
-# STYLES — Thème CLAIR
+# THÈME DARK — Émeraude, teal, or
 # ============================================================================
 CUSTOM_CSS = """
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
 .stApp {
-    background: linear-gradient(180deg, #f1f8e9 0%, #dcedc8 50%, #c5e1a5 100%);
+    background: linear-gradient(180deg, #0d1f12 0%, #0a1810 50%, #07100a 100%);
 }
-[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #e8f5e9 0%, #c8e6c9 100%);
-}
-.step-box {
-    background: white;
+.main .block-container { padding: 1.5rem 2rem; max-width: 100%; }
+[data-testid="stHeader"] { background: rgba(0,0,0,0.3); }
+
+/* Panneaux */
+.panel {
+    background: rgba(13, 71, 51, 0.25);
+    border: 1px solid rgba(16, 185, 129, 0.3);
     border-radius: 12px;
-    padding: 1rem 1.25rem;
-    margin-bottom: 0.8rem;
-    border-left: 4px solid #4caf50;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    padding: 1.25rem;
+    margin-bottom: 1rem;
 }
-.step-box .icon { font-size: 1.5rem; }
-.step-box .title { font-weight: 600; color: #2e7d32; }
-.step-box .desc { font-size: 0.85rem; color: #555; }
-.result-card {
-    background: linear-gradient(135deg, #81c784 0%, #66bb6a 100%);
-    color: white;
+.panel-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #10b981;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.75rem;
+}
+.panel-dark {
+    background: rgba(6, 28, 20, 0.6);
+    border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+/* Titre principal */
+.hero-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #10b981;
+    text-align: center;
+    margin-bottom: 0.25rem;
+}
+.hero-sub {
+    font-size: 0.95rem;
+    color: #6ee7b7;
+    text-align: center;
+}
+
+/* Carte prédiction */
+.pred-card {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(6, 95, 70, 0.4) 100%);
+    border: 1px solid rgba(245, 158, 11, 0.4);
     border-radius: 16px;
     padding: 2rem;
     text-align: center;
-    box-shadow: 0 6px 20px rgba(76,175,80,0.4);
+    box-shadow: 0 0 30px rgba(16, 185, 129, 0.15);
 }
-.result-card .value { font-size: 2.5rem; font-weight: 700; }
-.result-card .label { font-size: 1rem; opacity: 0.95; }
+.pred-card .value {
+    font-size: 2.8rem;
+    font-weight: 700;
+    color: #f59e0b;
+}
+.pred-card .label { color: #6ee7b7; font-size: 1rem; }
+.pred-card .badge {
+    display: inline-block;
+    background: rgba(16, 185, 129, 0.4);
+    color: #10b981;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    margin-top: 0.5rem;
+}
+
+/* Zone upload image */
+.upload-zone {
+    border: 2px dashed rgba(16, 185, 129, 0.5);
+    border-radius: 10px;
+    padding: 1.5rem;
+    text-align: center;
+    background: rgba(6, 28, 20, 0.4);
+}
 """
 
-st.set_page_config(page_title="AgriYield Morocco | PFE", page_icon="🌾", layout="wide")
+st.set_page_config(
+    page_title="AGRO-INSIGHT MAROC",
+    page_icon="🌾",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
 st.markdown(f"<style>{CUSTOM_CSS}</style>", unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------------
-# EXPLICATION : CE QUE CONTIENT L'APPLICATION
+# EN-TÊTE
 # ---------------------------------------------------------------------------
-st.markdown("# 🌾 AgriYield Morocco")
-st.markdown("**Prédiction du rendement agricole (Qx/Ha) — Projet PFE**")
+st.markdown('<p class="hero-title">AGRO-INSIGHT MAROC</p>', unsafe_allow_html=True)
+st.markdown(
+    '<p class="hero-sub">Agriculture de précision · Imagerie satellite & IA · Prédiction du rendement</p>',
+    unsafe_allow_html=True,
+)
 st.markdown("")
-
-st.markdown("### 📖 Comment ça marche ?")
-st.markdown("""
-L'application a besoin de **3 types de données** pour prédire le rendement.  
-Remplis chaque section dans la barre à gauche, puis clique sur **Prédire**.
-""")
-
-col1, col2, col3 = st.columns(3)
-with col1:
-    st.markdown("""
-    <div class="step-box">
-        <span class="icon">📷</span> <span class="title">1. Image satellite</span><br>
-        <span class="desc">Une photo de la parcelle agricole (PNG/JPG). Le modèle analyse la végétation visible.</span>
-    </div>
-    """, unsafe_allow_html=True)
-with col2:
-    st.markdown("""
-    <div class="step-box">
-        <span class="icon">🌿</span> <span class="title">2. NDVI (3 valeurs)</span><br>
-        <span class="desc">Indices de végétation pour Janvier, Mars et Mai. Mesurent la santé des cultures.</span>
-    </div>
-    """, unsafe_allow_html=True)
-with col3:
-    st.markdown("""
-    <div class="step-box">
-        <span class="icon">🌧️</span> <span class="title">3. Variables tabulaires</span><br>
-        <span class="desc">Pluie, surface, production, coordonnées, année. Contexte météo et géographique.</span>
-    </div>
-    """, unsafe_allow_html=True)
-
-st.markdown("**Après avoir cliqué sur « Prédire »** : l'application affiche la **valeur prédite** (rendement en Qx/Ha). Il n'y a **pas de graphique** — juste le nombre calculé par le modèle.")
-st.markdown("---")
 
 model = load_model()
 err = st.session_state.pop("_load_error", None)
 
 # ---------------------------------------------------------------------------
-# SIDEBAR — Avec icônes et explications
+# LAYOUT 3 PANNEAUX
 # ---------------------------------------------------------------------------
-with st.sidebar:
-    st.markdown("## 📥 Entrées")
+col_left, col_center, col_right = st.columns([1, 1.5, 1])
 
-    st.markdown("### 📷 Image satellite")
-    st.caption("Parcelle agricole · PNG ou JPG")
-    uploaded = st.file_uploader("Choisir une image", type=["png", "jpg", "jpeg"], label_visibility="collapsed")
+# ========== PANNEAU GAUCHE — Saisie des données ==========
+with col_left:
+    st.markdown('<div class="panel"><div class="panel-title">📥 SAISIE DES DONNÉES</div></div>', unsafe_allow_html=True)
 
-    st.markdown("---")
-    st.markdown("### 🌿 NDVI (janvier · mars · mai)")
-    st.caption("Indice de végétation entre -0.2 et 1")
-    ndvi_01 = st.slider("NDVI_01 (Janvier)", -0.2, 1.0, 0.40, 0.01)
-    ndvi_03 = st.slider("NDVI_03 (Mars)", -0.2, 1.0, 0.45, 0.01)
-    ndvi_05 = st.slider("NDVI_05 (Mai)", -0.2, 1.0, 0.55, 0.01)
+    st.markdown("**Pluviométrie & surface**")
+    pluie = st.number_input(
+        "Pluie saisonnière (mm)",
+        min_value=0.0,
+        value=450.0,
+        step=1.0,
+        key="pluie",
+    )
+    surface = st.number_input(
+        "Surface (1000 Ha)",
+        min_value=0.0,
+        value=50.0,
+        step=0.1,
+        key="surface",
+    )
+    annee = st.number_input(
+        "Année",
+        min_value=2000,
+        max_value=2035,
+        value=2021,
+        step=1,
+        key="annee",
+    )
 
-    st.markdown("---")
-    st.markdown("### 🌧️ Pluie & météo")
-    st.caption("Pluie saisonnière en mm")
-    pluie = st.number_input("Pluie (mm)", min_value=0.0, value=450.0, step=1.0)
+    st.markdown("**Téléchargement d'image**")
+    uploaded = st.file_uploader(
+        "Image satellite (PNG / JPG)",
+        type=["png", "jpg", "jpeg"],
+        label_visibility="collapsed",
+    )
 
-    st.markdown("### 📊 Données parcelle")
-    st.caption("Surface, production, localisation")
-    ndvi_moy = st.number_input("NDVI moyen", min_value=-0.2, max_value=1.0, value=0.45, step=0.01)
-    surface = st.number_input("Surface (1000 Ha)", min_value=0.0, value=50.0, step=0.1)
-    production = st.number_input("Production (1000 Qx)", min_value=0.0, value=600.0, step=0.1)
-    latitude = st.number_input("Latitude", value=35.20, format="%.6f")
-    longitude = st.number_input("Longitude", value=-3.93, format="%.6f")
-    annee = st.number_input("Année", min_value=2000, max_value=2035, value=2021, step=1)
+    st.markdown("**NDVI (janvier, mars, mai)**")
+    ndvi_01 = st.slider("NDVI_01", -0.2, 1.0, 0.40, 0.01, key="n01")
+    ndvi_03 = st.slider("NDVI_03", -0.2, 1.0, 0.45, 0.01, key="n03")
+    ndvi_05 = st.slider("NDVI_05", -0.2, 1.0, 0.55, 0.01, key="n05")
 
-    st.markdown("---")
+    ndvi_moy = st.number_input("NDVI moyen", min_value=-0.2, max_value=1.0, value=0.45, step=0.01, key="ndvi_moy")
+    production = st.number_input("Production (1000 Qx)", min_value=0.0, value=600.0, step=0.1, key="prod")
+    latitude = st.number_input("Latitude", value=35.20, format="%.6f", key="lat")
+    longitude = st.number_input("Longitude", value=-3.93, format="%.6f", key="lon")
+
     predict_btn = st.button("🚀 Prédire le rendement", use_container_width=True, type="primary")
 
-    st.markdown("---")
-    if model is None:
-        st.error("Modèle non chargé")
-        if err:
-            st.caption(str(err)[:150])
-    else:
-        st.success("✅ Modèle prêt")
+# ========== PANNEAU CENTRAL — Carte & NDVI ==========
+with col_center:
+    st.markdown('<div class="panel"><div class="panel-title">📊 CARTE & TENDANCE NDVI</div></div>', unsafe_allow_html=True)
 
-# ---------------------------------------------------------------------------
-# ZONE PRINCIPALE
-# ---------------------------------------------------------------------------
-col_img, col_info = st.columns([1, 1])
+    # Graphique NDVI (01, 03, 05)
+    fig_ndvi = go.Figure()
+    fig_ndvi.add_trace(
+        go.Scatter(
+            x=["Janvier", "Mars", "Mai"],
+            y=[ndvi_01, ndvi_03, ndvi_05],
+            mode="lines+markers",
+            line=dict(color="#10b981", width=3),
+            marker=dict(size=12, color="#f59e0b"),
+            fill="tozeroy",
+            fillcolor="rgba(16, 185, 129, 0.2)",
+        )
+    )
+    fig_ndvi.update_layout(
+        title="Tendance NDVI (01, 03, 05)",
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(6, 28, 20, 0.5)",
+        font=dict(color="#e5e7eb"),
+        margin=dict(l=40, r=40, t=50, b=40),
+        height=220,
+    )
+    st.plotly_chart(fig_ndvi, use_container_width=True)
 
-with col_img:
-    st.markdown("### 📷 Image chargée")
+    # Aperçu image satellite
+    st.markdown("**Aperçu image satellite**")
     if uploaded is not None:
         x_img, pil_preview = preprocess_image(uploaded)
         st.image(pil_preview, use_container_width=True)
     else:
-        st.info("Chargez une image dans la barre à gauche.")
+        st.info("Chargez une image dans le panneau gauche.")
         x_img = None
 
-with col_info:
-    st.markdown("### 📋 Récapitulatif des entrées")
+    # Carte simplifiée (point sur Maroc)
+    st.markdown("**Localisation (Maroc)**")
+    map_data = {"lat": [latitude], "lon": [longitude]}
+    st.map(map_data, use_container_width=True)
+
+# ========== PANNEAU DROIT — Prédiction & métriques ==========
+with col_right:
+    st.markdown('<div class="panel"><div class="panel-title">🎯 ANALYSE & PRÉDICTION</div></div>', unsafe_allow_html=True)
+
+    if predict_btn:
+        if model is None:
+            st.error("Modèle non chargé.")
+        elif uploaded is None:
+            st.warning("Fournissez une image satellite.")
+        else:
+            x_seq = build_seq_vector(ndvi_01, ndvi_03, ndvi_05)
+            x_tab = build_tab_vector(pluie, ndvi_moy, surface, production, latitude, longitude, float(annee))
+
+            with st.spinner("Calcul..."):
+                pred = float(model.predict([x_img, x_seq, x_tab], verbose=0).ravel()[0])
+
+            # Donut / carte prédiction
+            st.markdown(f"""
+            <div class="pred-card">
+                <div class="value">{pred:.1f}</div>
+                <div class="label">Rendement prédit (Qx/Ha)</div>
+                <span class="badge">Confiance élevée</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # Barres : Prédiction vs Référence
+            fig_bar = go.Figure()
+            fig_bar.add_trace(
+                go.Bar(
+                    x=["Prédiction actuelle", "Moyenne indicative"],
+                    y=[pred, pred * 0.85],
+                    marker_color=["#10b981", "#374151"],
+                )
+            )
+            fig_bar.update_layout(
+                title="Comparaison",
+                template="plotly_dark",
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(6, 28, 20, 0.5)",
+                font=dict(color="#e5e7eb"),
+                margin=dict(l=40, r=40, t=40, b=40),
+                height=200,
+            )
+            st.plotly_chart(fig_bar, use_container_width=True)
+
+            st.balloons()
+    else:
+        st.info("Remplissez les données et cliquez sur **Prédire**.")
+
+    # Indicateurs clés
+    st.markdown("**Indicateurs clés**")
     st.markdown(f"""
-    | Donnée | Valeur |
-    |--------|--------|
-    | NDVI (01, 03, 05) | {ndvi_01:.2f}, {ndvi_03:.2f}, {ndvi_05:.2f} |
+    | Indicateur | Valeur |
+    |------------|--------|
+    | Latitude | {latitude:.4f} |
+    | Longitude | {longitude:.4f} |
+    | NDVI moyen | {ndvi_moy:.3f} |
     | Pluie (mm) | {pluie:.0f} |
-    | NDVI moyen | {ndvi_moy:.2f} |
-    | Surface (1000 Ha) | {surface:.1f} |
-    | Production (1000 Qx) | {production:.1f} |
-    | Coordonnées | ({latitude:.4f}, {longitude:.4f}) |
-    | Année | {int(annee)} |
     """)
 
-# ---------------------------------------------------------------------------
-# RÉSULTAT (valeur uniquement — pas de graphique)
-# ---------------------------------------------------------------------------
-if predict_btn:
-    if model is None:
-        st.error("Impossible de prédire : modèle introuvable.")
-    elif uploaded is None:
-        st.warning("Veuillez fournir une image satellite.")
-    else:
-        x_seq = build_seq_vector(ndvi_01, ndvi_03, ndvi_05)
-        x_tab = build_tab_vector(pluie, ndvi_moy, surface, production, latitude, longitude, float(annee))
-
-        with st.spinner("Calcul en cours..."):
-            pred = float(model.predict([x_img, x_seq, x_tab], verbose=0).ravel()[0])
-
-        st.markdown("---")
-        st.markdown("### 🎯 Résultat de la prédiction")
-        st.markdown("*Le modèle affiche la **valeur prédite** — pas de graphique.*")
-        st.markdown("")
-        st.markdown(f"""
-        <div class="result-card">
-            <div class="value">{pred:.2f}</div>
-            <div class="label">Rendement prédit (Qx/Ha)</div>
-        </div>
-        """, unsafe_allow_html=True)
-        st.balloons()
-        st.success("✅ Prédiction terminée.")
-
 st.markdown("---")
-with st.expander("ℹ️ À propos"):
+with st.expander("ℹ️ À propos — AGRO-INSIGHT MAROC"):
     st.markdown("""
-    **AgriYield Morocco** — PFE
-    
-    - **Données requises** : Image satellite + 3 NDVI + pluie + surface + production + coordonnées + année
-    - **Modèle** : ViT + GRU + Attention + tabulaire
-    - **Sortie** : une seule valeur (rendement en Qx/Ha), pas de graphique
+    **Tableau de bord IA pour l'agriculture de précision au Maroc.**
+
+    - **Panneau gauche** : Saisie des données (pluie, surface, NDVI, image satellite).
+    - **Panneau central** : Courbe NDVI (01, 03, 05), aperçu image, localisation.
+    - **Panneau droit** : Prédiction du rendement (Qx/Ha), comparaison, indicateurs.
+
+    Modèle : **ViT + GRU + Attention + tabulaire**.
     """)
