@@ -79,8 +79,18 @@ st.markdown("""
 # --- CHARGEMENT DES DONNÉES (pour les menus) ---
 @st.cache_data
 def load_data():
-    df = pd.read_csv("base_finale_2060.csv")
-    return df
+    try:
+        # On essaie d'abord avec latin-1 qui gère bien les accents français/marocains du CSV
+        df = pd.read_csv("base_finale_2060.csv", encoding='latin-1')
+        return df
+    except Exception as e:
+        try:
+            # Si ça rate, on tente utf-8
+            df = pd.read_csv("base_finale_2060.csv", encoding='utf-8')
+            return df
+        except Exception as e2:
+            st.error(f"Erreur de lecture du fichier : {e2}")
+            return pd.DataFrame()
 
 df = load_data()
 
